@@ -15,6 +15,12 @@ import asyncio
 import voluptuous as vol
 from awesomeversion import AwesomeVersion
 
+try:
+    from pyShelly import pyShelly as ImportedPyShelly
+except Exception as e:
+    ImportedPyShelly = None
+    import_error = e
+
 if os.getenv("SHELLY_DEBUGPY"):
     import debugpy
     debugpy.listen(5678)
@@ -294,15 +300,18 @@ class ShellyInstance():
         self.local_py_shelly = conf.get(CONF_LOCAL_PY_SHELLY)
         if self.local_py_shelly:
             _LOGGER.info("Loading local pyShelly")
-            #pylint: disable=no-name-in-module
-            from .pyShelly import pyShelly
+            from .pyShelly import pyShelly as LoadedPyShelly
         else:
-            from pyShelly import pyShelly
+            if not ImportedPyShelly:
+                _LOGGER.error("Failed to import pyShelly: %s", import_error)
+                return
+            LoadedPyShelly = ImportedPyShelly
 
         additional_info = conf.get(CONF_ADDITIONAL_INFO)
         update_interval = conf.get(CONF_SCAN_INTERVAL)
 
-        self.pys = pys = pyShelly(self.hass.loop)
+        #self.pys = pys = pyShelly(self.hass.loop)
+        self.pys = pys = LoadedPyShelly(self.hass.loop)
         _LOGGER.info("pyShelly, %s", pys.version())
         pys.cb_block_added.append(self._block_added)
         pys.cb_device_added.append(self._device_added)
